@@ -213,7 +213,6 @@ mem_init(void)
 		perm_paging |= PTE_PS;
 	}
     boot_map_region(kern_pgdir, KERNBASE, 0x100000000 - KERNBASE, 0, perm_paging);
-    cprintf("finished all the mem\n");
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
 
