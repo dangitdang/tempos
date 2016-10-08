@@ -1,0 +1,14 @@
+Part A
+
+1. It is mainly for protection between user space and the kernel space. The handlers push the arguments
+to the specific interrupt's handler and also which function the interrupt. Since we're hardcoding these
+info the user doesn't have control over control. If all exceptions were delievered
+to the same handler then we won't be able to know which interrupt/exceptions trigged the handler.
+We don't have a way to pass the handler the info from the trapframe. We would have to map the IDT descriptor
+to the handler and then to the interrupt.
+
+2.
+No we didn't have to do anything. user_softint can't invoke the interrupt as its CP bits are not
+0. When we map the trap init only CP0 can invoke interrupt 14. The mismatch in the CP bits causes
+the processor to throw a 13 interrupt. Right now if the $14 instruction to inoke the kernel's page fault handler
+then will just kill the user process.
