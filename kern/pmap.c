@@ -440,10 +440,12 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	for (int i = 0; i < size; i+=PGSIZE){
 		pte_t *entry = pgdir_walk(pgdir, (void*) cur_ptr, 1);
 		*entry = (cur_pa_ptr | perm | PTE_P);
-
+		pgdir[PDX(cur_ptr)] |= perm | PTE_P;
 		cur_pa_ptr += PGSIZE;
 		cur_ptr	   += PGSIZE;
+		
 	}
+	
 }
 
 //
@@ -584,7 +586,26 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	uint32_t start = (uint32_t) va;
+	uint32_t until = start + len;
+	
+	start = ROUNDDOWN(start, PGSIZE);
+	pte_t *entry;
 
+	while (start < until) {
+		entry = pgdir_walk(env->env_pgdir, (void *) start, false);
+		if (!entry || // Page doesn't exist
+			start > ULIM ||	// greater than ULIM
+			(((uint32_t) *entry & perm) != perm)) {
+				if (start == ROUNDDOWN((uint32_t) va, PGSIZE)) {
+					user_mem_check_addr = (uintptr_t) va;
+				} else {
+					user_mem_check_addr = (uintptr_t) start;
+				}
+				return -E_FAULT;
+			}
+		start += PGSIZE; 
+	}
 	return 0;
 }
 
@@ -598,7 +619,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 {
-	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
+	if (user_mem_check(env, va, len, perm | PTE_U | PTE_P) < 0) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
