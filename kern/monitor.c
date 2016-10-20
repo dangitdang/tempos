@@ -25,6 +25,9 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "Display the backtrace of the current stack ", mon_backtrace},
+	{ "singlestep", "Step one instruction and break", mon_singlestep},
+	{ "continue", "Continue execution as normal", mon_continue}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -59,10 +62,43 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	int max_args = 5;
+	int i;
+	struct Eipdebuginfo info;
+	uint32_t ebp = read_ebp();
+	uint32_t prev_ebp, eip;
+
+	char *format = "ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n";
+	char *info_format = "\t %s:%d: %.*s+%d\n";
+	uint32_t args[max_args];
+	cprintf("Stack backtrace:\n");
+	while (ebp != 0) {
+		prev_ebp = *(uint32_t *)ebp;
+		eip = *((uint32_t *)ebp + 1);
+
+		for (i = 0; i < max_args; i++) {
+			args[i] = (uint32_t)*((uint32_t* )ebp + (i + 2)); 
+		}
+
+		debuginfo_eip((uintptr_t) eip, &info);
+		cprintf(format, ebp, eip, args[0], args[1], args[2], args[3], args[4]);
+		cprintf(info_format, info.eip_file, info.eip_line, info.eip_fn_namelen, \
+				info.eip_fn_name, eip - info.eip_fn_addr);
+
+		ebp = prev_ebp;
+	}
 	return 0;
 }
 
+int mon_singlestep(int argc, char **argv, struct Trapframe *tf) {
+	tf->tf_eflags |= FL_TF;
+	return -1;
+}
 
+int mon_continue(int argc, char **argv, struct Trapframe *tf) {
+	tf->tf_eflags &= ~FL_TF;
+	return -1;
+}
 
 /***** Kernel monitor command interpreter *****/
 

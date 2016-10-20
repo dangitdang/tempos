@@ -1,0 +1,56 @@
+1. It has to be a uintptr_t. The kernel dereference the pointer and set the value.
+So the pointer must not be a physical address as we will interpret it as a virtual
+address and write somewhere we might not want to.
+
+2. 
+
+PDE         Virtual address             Points to
+1023        0xFFBFFFFF                  Table for top 4MB of Physical mem
+ |              |       
+ |              |                       Page tables for kernel use
+ |              |
+ 959        0xF0000000                  First page table by the kernel
+ 958        0xEFC00000                  Kernel Stack?
+ |              |                      
+ |              |                       
+ |              |                       
+ 955        0xEF000000                  User only mapped pages
+ |              |                       
+ |              |               
+ |              |
+ 0              0x0                     Virtual memory starts here
+
+ 3. This is due to the permission bit set in the page directory and each page entries.
+ These are the least significant 12 bits of any entry. If we are in user mode then only
+ user pages are readable. If we're in supervisor mode we can read all pages.
+
+ 4.1024 * 4MB per page directory = 4GB. Since we're in 32 bits, 2^32 = 4GB so we can only
+ address 4GB of memory.
+
+ 5. We are storing the page directory and tables. Then we have an array and linked list
+ storing the pages array and free pages.
+
+ 6. The transition happens when we jump to the relocated macro. The file entrypgdir.c 
+ enables mapping of 0-4M in virtual address to physical address of the same space.
+ This transition is required as the kernel runs at the high address space 0xF0000000.
+
+
+ Challenge Problem:
+
+ I decide to implement the 4MB table support for the physical memory mapping of KERNBASE.
+ This allows up to optimize by removing the need of page tables. The page directory contains 
+ a table of entries to physical addresses directly. Inorder to do this we need to modify
+ the boot_map_region function, the permission in mapping, and the check if the processor support
+ page size extension.
+
+ The check for page size extension is simple. We uses cpuid to check if the 3rd bit (0 index) of the edp
+ is 1 or not. If it is 1 the CPU support page size extension. Next we need to set this flag and rewrite it
+ to CR4. Once this is in place we can use CR4 to check for support in subsequent funciton. This check is done
+ in meminit().
+
+ We modify boot_map_region such that if the PTE_PS flag exists we want to increment by 
+ 4MB at a time. Unlike our previous mapping we won't be calling pg_walk to returns us a new
+ page table. Instead we can directly store the physical address directly into a slot.
+
+ My implementation did not change the check_va2pa function to check for functionality. However
+ this would be a way to test the implementation.  
