@@ -215,7 +215,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-    boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
+    //boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
     cprintf("boostack mapping done\n");
 	//////////////////////////////////////////////////////////////////////
     //
@@ -282,7 +282,19 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	
+//	for(int i = 0; i < NCPU; i++) {
+//		uintptr_t kstacktop = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+//		boot_map_region(kern_pgdir, kstacktop-KSTKSIZE, KSTKSIZE,PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+//	}
+	
+	uint32_t i;
+	uint32_t bottom_stack = KSTACKTOP - KSTKSIZE;
+	for (i = 0; i < NCPU; i++) {
+		boot_map_region(kern_pgdir, bottom_stack, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+		bottom_stack -= KSTKGAP; // guard
+		bottom_stack -= KSTKSIZE;
+	}
 }
 
 // --------------------------------------------------------------
@@ -306,6 +318,7 @@ page_init(void)
 
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
+	
 	//  1) Mark physical page 0 as in use.
 	//     This way we preserve the real-mode IDT and BIOS structures
 	//     in case we ever need them.  (Currently we don't, but...)
@@ -329,6 +342,7 @@ page_init(void)
 	page_free_list = NULL;
 	for (i = 0; i < npages; i++) {
 		if (i == 0 || 
+			i == PGNUM(MPENTRY_PADDR) ||
 			(npages_basemem <= i && i < extended_mem) ||
 			(extended_mem <= i && i < extended_mem + usedPages)) {
 				pages[i].pp_ref = 1;
@@ -628,7 +642,17 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	size_t rsize = ROUNDUP(size, PGSIZE);
+
+	if (rsize + base > MMIOLIM) {
+		panic("out of MMIO region");
+	}
+
+	boot_map_region(kern_pgdir, base, rsize, pa, PTE_PCD | PTE_PWT | PTE_W);
+
+	uintptr_t returnbase = base;
+	base += rsize;
+	return (void *) returnbase;
 }
 
 static uintptr_t user_mem_check_addr;
