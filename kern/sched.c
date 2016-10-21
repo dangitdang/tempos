@@ -28,13 +28,31 @@ sched_yield(void)
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
 
-	// LAB 4: Your code here.
-	for (idle = envs;idle < &envs[NENV]; idle++) {
+	// LAB 4: Your code here.	
+	int c= 0;
+	bool foundCurEnv = false;
+	for(idle = envs; idle < &envs[NENV]; idle++) {
+		c++;
+		if (idle == curenv) {
+			foundCurEnv = true;
+			break;
+		} 
+	}
+	idle = envs;
+	for(int i = 0; i < c; i++) {
+		idle++;
+	}
+	for(idle; idle < &envs[NENV]; idle++) {
 		if (idle->env_status == ENV_RUNNABLE) {
 			env_run(idle);
 		}
 	}
 
+	for(idle = envs; idle < &envs[c]; idle++) {
+		if (idle->env_status == ENV_RUNNABLE) {
+			env_run(idle);
+		}
+	}
 	if (curenv != NULL && curenv->env_status == ENV_RUNNING) {
 		env_run(curenv);
 	}

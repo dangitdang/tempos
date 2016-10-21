@@ -283,17 +283,9 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 	
-//	for(int i = 0; i < NCPU; i++) {
-//		uintptr_t kstacktop = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
-//		boot_map_region(kern_pgdir, kstacktop-KSTKSIZE, KSTKSIZE,PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
-//	}
-	
-	uint32_t i;
-	uint32_t bottom_stack = KSTACKTOP - KSTKSIZE;
-	for (i = 0; i < NCPU; i++) {
-		boot_map_region(kern_pgdir, bottom_stack, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
-		bottom_stack -= KSTKGAP; // guard
-		bottom_stack -= KSTKSIZE;
+	for(int i = 0; i < NCPU; i++) {
+		uintptr_t kstacktop = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir, kstacktop-KSTKSIZE, KSTKSIZE,PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
 	}
 }
 
