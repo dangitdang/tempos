@@ -144,7 +144,14 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	panic("sys_env_set_pgfault_upcall not implemented");
+	struct Env *env;
+
+	if (envid2env(envid, &env, 1) < 0) {
+		return -E_BAD_ENV;
+	}
+	env->env_pgfault_upcall = func;
+	return 0;
+
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -177,12 +184,15 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	struct Env *env;
 	if ((perm & PTE_U) != PTE_U) {
+		cprintf("here\n");
 		return -E_INVAL;
 	}
 	if ((perm & PTE_W) != PTE_W) {
+		cprintf("here2\n");
 		return -E_INVAL;
 	}
 	if ((perm & ~PTE_SYSCALL) != 0) {
+		cprintf("here3\n");
 		return -E_INVAL;
 	}
 
@@ -191,6 +201,8 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	}
 
 	if ((uint32_t) va >= UTOP || (uint32_t) va % PGSIZE != 0) {
+
+		cprintf("here4\n");
 		return -E_INVAL;
 	}
 
@@ -237,12 +249,16 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	// LAB 4: Your code here.
 	struct Env *src_env, *des_env;
 	if ((perm & PTE_U) != PTE_U) {
+
+		cprintf("here\n");
 		return -E_INVAL;
 	}
-	if ((perm & PTE_W) != PTE_W) {
+	if ((perm & PTE_P) != PTE_P) {
+		cprintf("here2\n");
 		return -E_INVAL;
 	}
 	if ((perm & ~PTE_SYSCALL) != 0) {
+		cprintf("here3\n");
 		return -E_INVAL;
 	}
 
@@ -252,9 +268,11 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	}
 
 	if ((uint32_t) srcva >= UTOP || ((uint32_t) srcva) % PGSIZE != 0) {
+		cprintf("here4\n");
 		return -E_INVAL;
 	}
 	if ((uint32_t) dstva >= UTOP || ((uint32_t) dstva) % PGSIZE != 0) {
+		cprintf("here5\n");
 		return -E_INVAL;
 	}
 
@@ -395,6 +413,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_alloc(a1, (void *) a2, a3);
 		case (SYS_exofork):
 			return sys_exofork();
+		case (SYS_env_set_pgfault_upcall):
+			return sys_env_set_pgfault_upcall(a1, (void *) a2);
 		default:
 			return -E_INVAL;
 	}

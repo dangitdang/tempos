@@ -25,11 +25,16 @@ void
 set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 {
 	int r;
-
+	int perm = PTE_W | PTE_U | PTE_P;
 	if (_pgfault_handler == 0) {
 		// First time through!
 		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
+		r = sys_page_alloc(thisenv->env_id, (void *) (UXSTACKTOP-PGSIZE), perm);
+		if (r < 0) {
+			panic("set_pgfault_handler: Cannot allocate exception stack page");
+		}
+
+		sys_env_set_pgfault_upcall(thisenv->env_id, _pgfault_upcall);
 	}
 
 	// Save handler pointer for assembly to call.

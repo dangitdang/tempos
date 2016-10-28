@@ -303,7 +303,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 		if (p == NULL){
 			panic("No more mem");
 		} 
-		int insertResult = page_insert(e->env_pgdir, p, start, PTE_U | PTE_W);
+		int insertResult = page_insert(e->env_pgdir, p, start, PTE_U | PTE_W | PTE_P);
 		if (insertResult != 0) {
 			panic("failed at insert lmao");
 		}
@@ -394,8 +394,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE );
-	// LAB 3: Your code here.
-	lcr3(PADDR(kern_pgdir));
 }
 
 //

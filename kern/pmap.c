@@ -438,7 +438,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		}
 		pp->pp_ref+=1;
 		//setting the contents of the address that pg_table points to to the physical address of the pageinfo struct pp
-        *pg_table = (page2pa(pp) | PTE_P | PTE_W);
+        *pg_table = (page2pa(pp) | PTE_P | PTE_W | PTE_U);
 	} else if (!(PTE_P & *pg_table) && !create) {
 		return NULL;
 	}

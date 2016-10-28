@@ -25,16 +25,33 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
-
+	if ((err & FEC_WR) == 0) {
+		panic("pgfault: faulting address %x wasn't a write", addr);
+	}
+	uint32_t pg_num = (uint32_t) ROUNDDOWN(addr, PGSIZE)/PGSIZE;
+	if (!(uvpt[pg_num] & PTE_COW)) {
+		panic("pgfault: faulting address %x is not on a copy-on-write page", addr);
+	}
+	
 	// Allocate a new page, map it at a temporary location (PFTEMP),
-	// copy the data from the old page to the new page, then move the new
+	// copy the data frm the old page to the new page, then move the new
 	// page to the old page's address.
 	// Hint:
 	//   You should make three system calls.
-
+	
 	// LAB 4: Your code here.
+	int perm = PTE_U | PTE_W | PTE_P;
+	r = sys_page_alloc(0, (void *) PFTEMP, perm);
+	if (r < 0) {
+		panic("pgfault: cannot allocate new page");
+	}
 
-	panic("pgfault not implemented");
+	memmove(PFTEMP,(void *) ROUNDDOWN(addr, PGSIZE), PGSIZE);
+	
+	r = sys_page_map(0, (void *) PFTEMP, 0,(void *) ROUNDDOWN(addr, PGSIZE), perm);
+	if (r < 0) {
+		panic("pgfault: cannot map new page");
+	}	
 }
 
 //
@@ -52,9 +69,29 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	int r;
+	int perm = PTE_P | PTE_COW;
+	void *va = (void *) (pn * PGSIZE);
+	// LAB 4: Your code ere.
+	if (uvpt[pn] & PTE_W || uvpt[pn] & PTE_COW) {
+		if (uvpt[pn] & PTE_U) {
+			perm |= PTE_U;
+		}
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
+		r = sys_page_map(thisenv->env_id, va, envid, va, perm);
+		if (r < 0) {
+			panic("duppage: cannot map parent to child");
+		}
+
+		r = sys_page_map(thisenv->env_id, va, thisenv->env_id, va, perm);
+		if (r < 0) {
+			panic("duppage: cannot parent to parent");
+		}
+	} else {
+		r = sys_page_map(thisenv->env_id, va, envid, va, uvpt[pn] & 0xFFF);
+		if (r < 0) {
+			panic("duppage: cannot map parent to child");
+		}
+	}
 	return 0;
 }
 
@@ -78,7 +115,46 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	envid_t child;
+
+	set_pgfault_handler(pgfault);
+
+	child = sys_exofork();
+
+	if (child < 0) {
+		panic("sys_exofork: %e", child);
+	}
+	// We're in the child now
+	if (child == 0) {
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+
+	pte_t *pte;
+	for (uint32_t i = 0; i < PGNUM(UTOP-PGSIZE); i++) {
+		uint32_t pdx = ROUNDDOWN(i,NPDENTRIES)/NPDENTRIES;
+		if ((uvpd[pdx] & PTE_P) == PTE_P && (uvpt[i] & PTE_P) == PTE_P) {
+			duppage(child, i);
+		}
+	}
+
+	int r;
+
+	r = sys_page_alloc(child, (void *) (UXSTACKTOP-PGSIZE), PTE_W | PTE_U | PTE_P);
+	if (r < 0) {
+		panic("fork: cant allocate page");
+	}
+	r = sys_env_set_pgfault_upcall(child, pgfault);
+	if (r < 0) {
+		panic("fork: failed setting pagefault");
+	}
+
+	r = sys_env_set_status(child, ENV_RUNNABLE);
+	if (r < 0) {
+		panic("fork: failed setting status");
+	}
+	return child;
 }
 
 // Challenge!
